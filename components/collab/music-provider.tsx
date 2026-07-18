@@ -9,161 +9,164 @@ import {
   useRef,
   useState,
 } from 'react'
-import { CATALOG, type QueueItem, type Song } from '@/lib/music'
+import type { QueueItem, Song } from '@/lib/music'
+import {
+  EMPTY_STATE,
+  addSongToQueue,
+  connectQueueSocket,
+  fetchQueueState,
+  notifyEnded,
+  toQueueItem,
+  toSong,
+  type BackendQueueState,
+} from '@/lib/api'
 
 type NowPlaying = {
   song: Song
-  /** segundos transcurridos */
-  elapsed: number
   requestedBy: string
-}
+  isBackup: boolean
+} | null
 
 type MyRequest = {
   entryId: string
   song: Song
   /** posición dentro de la cola (1 = siguiente) */
   position: number
-  /** segundos estimados hasta que suene */
+  /** segundos estimados hasta que suene, calculados por el backend */
   waitSeconds: number
 }
 
 type MusicContextValue = {
   nowPlaying: NowPlaying
+  /** segundos transcurridos, aproximado — el panel usa el tiempo real del player */
+  elapsed: number
   queue: QueueItem[]
-  isPlaying: boolean
-  currentUser: string
-  addSong: (song: Song) => string
-  removeFromQueue: (entryId: string) => void
-  togglePlay: () => void
-  skip: () => void
+  /** true si el WebSocket está conectado */
+  connected: boolean
+  addSong: (song: Song, mesa?: string) => Promise<void>
+  /** avisa al backend que la canción actual terminó / debe saltarse */
+  reportEnded: () => void
   myRequests: MyRequest[]
 }
 
 const MusicContext = createContext<MusicContextValue | null>(null)
+const MINE_IDS_KEY = 'sintonia-mine-ids'
 
-/** Estado inicial de ejemplo para que el panel se vea poblado */
-function seedQueue(): QueueItem[] {
-  const seeds: Array<[Song, string]> = [
-    [CATALOG[2], 'Mariana'],
-    [CATALOG[4], 'Diego'],
-    [CATALOG[7], 'Sofía'],
-    [CATALOG[1], 'Mariana'],
-  ]
-  return seeds.map(([song, requestedBy], i) => ({
-    entryId: `seed-${i}`,
-    song,
-    requestedBy,
-    mine: false,
-  }))
+function loadMineIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set()
+  try {
+    const raw = window.localStorage.getItem(MINE_IDS_KEY)
+    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+  } catch {
+    return new Set()
+  }
 }
 
-let entryCounter = 0
+function saveMineIds(ids: Set<string>) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(MINE_IDS_KEY, JSON.stringify([...ids]))
+}
 
 export function MusicProvider({ children }: { children: React.ReactNode }) {
-  const currentUser = 'Tú'
-  const [queue, setQueue] = useState<QueueItem[]>(seedQueue)
-  const [nowPlaying, setNowPlaying] = useState<NowPlaying>(() => ({
-    song: CATALOG[0],
-    elapsed: 42,
-    requestedBy: 'Valentina',
-  }))
-  const [isPlaying, setIsPlaying] = useState(true)
+  const [rawState, setRawState] = useState<BackendQueueState>(EMPTY_STATE)
+  const [connected, setConnected] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
 
-  const advance = useCallback(() => {
-    setQueue((prevQueue) => {
-      if (prevQueue.length === 0) {
-        setNowPlaying((np) => ({ ...np, elapsed: 0 }))
-        return prevQueue
-      }
-      const [next, ...rest] = prevQueue
-      setNowPlaying({
-        song: next.song,
-        elapsed: 0,
-        requestedBy: next.requestedBy,
+  const mineIdsRef = useRef<Set<string>>(loadMineIds())
+  const socketRef = useRef<WebSocket | null>(null)
+  const currentEntryIdRef = useRef<string | null>(null)
+
+  // Carga el estado inicial por REST y abre el WebSocket para las actualizaciones en vivo.
+  useEffect(() => {
+    let cancelled = false
+
+    fetchQueueState()
+      .then((state) => {
+        if (!cancelled) setRawState(state)
       })
-      return rest
-    })
+      .catch(() => {
+        // si falla la carga inicial, el WebSocket eventualmente trae el estado igual
+      })
+
+    const socket = connectQueueSocket((state) => setRawState(state))
+    socket.onopen = () => setConnected(true)
+    socket.onclose = () => setConnected(false)
+    socket.onerror = () => setConnected(false)
+    socketRef.current = socket
+
+    return () => {
+      cancelled = true
+      socket.close()
+      socketRef.current = null
+    }
   }, [])
 
-  // Reloj de reproducción
+  // Reloj visual local (solo para la barra de progreso del cliente): se
+  // reinicia cada vez que cambia la entrada que está sonando.
   useEffect(() => {
-    if (!isPlaying) return
-    const id = setInterval(() => {
-      setNowPlaying((np) => {
-        if (np.elapsed + 1 >= np.song.duration) {
-          // avanzar en el siguiente tick para evitar setState anidado raro
-          queueMicrotask(advance)
-          return { ...np, elapsed: np.song.duration }
-        }
-        return { ...np, elapsed: np.elapsed + 1 }
-      })
-    }, 1000)
-    return () => clearInterval(id)
-  }, [isPlaying, advance])
+    const entryId = rawState.nowPlaying?.id ?? null
+    if (entryId !== currentEntryIdRef.current) {
+      currentEntryIdRef.current = entryId
+      setElapsed(0)
+    }
+  }, [rawState.nowPlaying?.id])
 
-  const addSong = useCallback(
-    (song: Song) => {
-      const entryId = `req-${entryCounter++}`
-      setQueue((prev) => [
-        ...prev,
-        { entryId, song, requestedBy: currentUser, mine: true },
-      ])
-      return entryId
-    },
-    [currentUser],
+  useEffect(() => {
+    const duration = rawState.nowPlaying?.song.durationSeconds
+    if (!duration) return
+    const timer = setInterval(() => {
+      setElapsed((prev) => (prev + 1 >= duration ? duration : prev + 1))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [rawState.nowPlaying?.id, rawState.nowPlaying?.song.durationSeconds])
+
+  const nowPlaying = useMemo<NowPlaying>(() => {
+    if (!rawState.nowPlaying) return null
+    return {
+      song: toSong(rawState.nowPlaying.song),
+      requestedBy:
+        rawState.nowPlaying.mesa && rawState.nowPlaying.mesa.trim()
+          ? rawState.nowPlaying.mesa.trim()
+          : 'la casa',
+      isBackup: rawState.nowPlaying.isBackup,
+    }
+  }, [rawState.nowPlaying])
+
+  const queue = useMemo<QueueItem[]>(
+    () => rawState.queue.map((item) => toQueueItem(item, mineIdsRef.current)),
+    [rawState.queue],
   )
 
-  const removeFromQueue = useCallback((entryId: string) => {
-    setQueue((prev) => prev.filter((q) => q.entryId !== entryId))
-  }, [])
-
-  const togglePlay = useCallback(() => setIsPlaying((p) => !p), [])
-  const skip = useCallback(() => advance(), [advance])
-
   const myRequests = useMemo<MyRequest[]>(() => {
-    const remainingNow = Math.max(
-      0,
-      nowPlaying.song.duration - nowPlaying.elapsed,
-    )
-    let cumulative = remainingNow
     const result: MyRequest[] = []
-    queue.forEach((item, index) => {
-      if (item.mine) {
+    rawState.queue.forEach((item, index) => {
+      if (mineIdsRef.current.has(item.id)) {
         result.push({
-          entryId: item.entryId,
-          song: item.song,
+          entryId: item.id,
+          song: toSong(item.song),
           position: index + 1,
-          waitSeconds: cumulative,
+          waitSeconds: rawState.estimatedWaitSecs[index] ?? 0,
         })
       }
-      cumulative += item.song.duration
     })
     return result
-  }, [queue, nowPlaying])
+  }, [rawState.queue, rawState.estimatedWaitSecs])
+
+  const addSong = useCallback(async (song: Song, mesa?: string) => {
+    const created = await addSongToQueue(song.id, mesa)
+    mineIdsRef.current.add(created.id)
+    saveMineIds(mineIdsRef.current)
+    // No hace falta actualizar rawState manualmente: el backend hace
+    // broadcast por WebSocket y ese mensaje trae el estado ya actualizado.
+  }, [])
+
+  const reportEnded = useCallback(() => {
+    notifyEnded(socketRef.current)
+  }, [])
 
   const value = useMemo<MusicContextValue>(
-    () => ({
-      nowPlaying,
-      queue,
-      isPlaying,
-      currentUser,
-      addSong,
-      removeFromQueue,
-      togglePlay,
-      skip,
-      myRequests,
-    }),
-    [
-      nowPlaying,
-      queue,
-      isPlaying,
-      currentUser,
-      addSong,
-      removeFromQueue,
-      togglePlay,
-      skip,
-      myRequests,
-    ],
+    () => ({ nowPlaying, elapsed, queue, connected, addSong, reportEnded, myRequests }),
+    [nowPlaying, elapsed, queue, connected, addSong, reportEnded, myRequests],
   )
 
   return <MusicContext.Provider value={value}>{children}</MusicContext.Provider>

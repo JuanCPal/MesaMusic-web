@@ -1,39 +1,87 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import {
   Check,
   Clock3,
   ListMusic,
+  Loader2,
   Music2,
   Plus,
   Search,
   Volume2,
 } from 'lucide-react'
-import { CATALOG, formatDuration, formatWait, type Song } from '@/lib/music'
+import { formatDuration, formatWait, type Song } from '@/lib/music'
+import { searchSongs } from '@/lib/api'
 import { useMusic } from './music-provider'
 import { ProgressBar } from './progress-bar'
 
-export function ClientView() {
-  const { nowPlaying, addSong, myRequests } = useMusic()
-  const [query, setQuery] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
+const MESA_KEY = 'sintonia-mesa'
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return CATALOG
-    return CATALOG.filter(
-      (s) =>
-        s.title.toLowerCase().includes(q) ||
-        s.channel.toLowerCase().includes(q),
-    )
+export function ClientView() {
+  const { nowPlaying, elapsed, addSong, myRequests, connected } = useMusic()
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<Song[]>([])
+  const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+  const [mesa, setMesa] = useState('')
+
+  const abortRef = useRef<AbortController | null>(null)
+
+  // Recuerda el nombre/mesa entre visitas en el mismo dispositivo
+  useEffect(() => {
+    const saved = window.localStorage.getItem(MESA_KEY)
+    if (saved) setMesa(saved)
+  }, [])
+
+  function handleMesaChange(value: string) {
+    setMesa(value)
+    window.localStorage.setItem(MESA_KEY, value)
+  }
+
+  // Búsqueda contra el backend, con debounce para no gastar cuota de la API en cada tecla
+  useEffect(() => {
+    const q = query.trim()
+    if (!q) {
+      setResults([])
+      setSearchError(null)
+      setSearching(false)
+      return
+    }
+
+    setSearching(true)
+    const timeout = setTimeout(() => {
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+
+      searchSongs(q, controller.signal)
+        .then((songs) => {
+          setResults(songs)
+          setSearchError(null)
+        })
+        .catch((err) => {
+          if (err.name !== 'AbortError') {
+            setSearchError('No se pudo buscar. Intenta de nuevo.')
+          }
+        })
+        .finally(() => setSearching(false))
+    }, 350)
+
+    return () => clearTimeout(timeout)
   }, [query])
 
-  function handleAdd(song: Song) {
-    addSong(song)
-    setToast(song.title)
-    window.setTimeout(() => setToast(null), 2200)
+  async function handleAdd(song: Song) {
+    try {
+      await addSong(song, mesa.trim() || undefined)
+      setToast(song.title)
+      window.setTimeout(() => setToast(null), 2200)
+    } catch {
+      setToast('No se pudo agregar, intenta de nuevo')
+      window.setTimeout(() => setToast(null), 2200)
+    }
   }
 
   return (
@@ -46,9 +94,24 @@ export function ClientView() {
           </span>
           <div className="leading-tight">
             <p className="text-sm font-semibold">Sintonía</p>
-            <p className="text-xs text-muted-foreground">Bar La Terraza</p>
+            <p className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span
+                className={`size-1.5 rounded-full ${connected ? 'bg-primary' : 'bg-muted-foreground/50'}`}
+              />
+              {connected ? 'Conectado' : 'Conectando…'}
+            </p>
           </div>
         </div>
+
+        <input
+          type="text"
+          value={mesa}
+          onChange={(e) => handleMesaChange(e.target.value)}
+          placeholder="Tu nombre o mesa (opcional)"
+          aria-label="Tu nombre o mesa"
+          className="mb-2 h-9 w-full rounded-lg border border-input bg-secondary px-3 text-xs text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
+        />
+
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -58,41 +121,53 @@ export function ClientView() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Busca una canción o artista…"
             aria-label="Buscar canciones"
-            className="h-11 w-full rounded-xl border border-input bg-secondary pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
+            className="h-11 w-full rounded-xl border border-input bg-secondary pl-9 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
           />
+          {searching ? (
+            <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+          ) : null}
         </div>
       </header>
 
       <main className="flex-1 space-y-5 px-4 pb-32 pt-4">
         {/* Sonando ahora */}
-        <section aria-labelledby="now-playing-heading">
-          <div className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-primary">
-            <Volume2 className="size-3.5" />
-            <h2 id="now-playing-heading">Sonando ahora</h2>
-          </div>
-          <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
-            <Image
-              src={nowPlaying.song.thumbnail || '/placeholder.svg'}
-              alt=""
-              width={56}
-              height={56}
-              className="size-14 flex-none rounded-lg object-cover"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-card-foreground">
-                {nowPlaying.song.title}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">
-                {nowPlaying.song.channel}
-              </p>
-              <ProgressBar
-                className="mt-2"
-                elapsed={nowPlaying.elapsed}
-                duration={nowPlaying.song.duration}
-              />
+        {nowPlaying ? (
+          <section aria-labelledby="now-playing-heading">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-primary">
+              <Volume2 className="size-3.5" />
+              <h2 id="now-playing-heading">Sonando ahora</h2>
             </div>
-          </div>
-        </section>
+            <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
+              <Image
+                src={nowPlaying.song.thumbnail || '/placeholder.svg'}
+                alt=""
+                width={56}
+                height={56}
+                unoptimized
+                className="size-14 flex-none rounded-lg object-cover"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-card-foreground">
+                  {nowPlaying.song.title}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {nowPlaying.song.channel}
+                </p>
+                <ProgressBar
+                  className="mt-2"
+                  elapsed={elapsed}
+                  duration={nowPlaying.song.duration}
+                />
+              </div>
+            </div>
+          </section>
+        ) : (
+          <section>
+            <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+              Todavía no suena nada. ¡Agrega la primera canción!
+            </div>
+          </section>
+        )}
 
         {/* Mi solicitud */}
         {myRequests.length > 0 ? (
@@ -144,11 +219,19 @@ export function ClientView() {
             id="results-heading"
             className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
           >
-            {query.trim() ? 'Resultados' : 'Sugerencias'}
+            Resultados
           </h2>
-          {results.length === 0 ? (
+          {!query.trim() ? (
             <p className="rounded-xl border border-border bg-card p-4 text-center text-sm text-muted-foreground">
-              Sin resultados para “{query}”.
+              Escribe el nombre de una canción o artista para empezar.
+            </p>
+          ) : searchError ? (
+            <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-center text-sm text-destructive">
+              {searchError}
+            </p>
+          ) : results.length === 0 && !searching ? (
+            <p className="rounded-xl border border-border bg-card p-4 text-center text-sm text-muted-foreground">
+              Sin resultados para &ldquo;{query}&rdquo;.
             </p>
           ) : (
             <ul className="space-y-1">
@@ -164,6 +247,7 @@ export function ClientView() {
                       alt=""
                       width={48}
                       height={48}
+                      unoptimized
                       className="size-12 flex-none rounded-md object-cover"
                     />
                     <div className="min-w-0 flex-1">
@@ -194,7 +278,7 @@ export function ClientView() {
           <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-lg">
             <Check className="size-4" />
             <span className="max-w-[70vw] truncate">
-              “{toast}” se agregó a la cola
+              &ldquo;{toast}&rdquo; se agregó a la cola
             </span>
           </div>
         ) : null}
