@@ -30,6 +30,11 @@ export function ClientView() {
 
   const abortRef = useRef<AbortController | null>(null)
 
+  function messageFromUnknown(err: unknown, fallback: string): string {
+    if (err instanceof Error && err.message.trim()) return err.message
+    return fallback
+  }
+
   // Recuerda el nombre/mesa entre visitas en el mismo dispositivo
   useEffect(() => {
     const saved = window.localStorage.getItem(MESA_KEY)
@@ -64,7 +69,7 @@ export function ClientView() {
         })
         .catch((err) => {
           if (err.name !== 'AbortError') {
-            setSearchError('No se pudo buscar. Intenta de nuevo.')
+            setSearchError(messageFromUnknown(err, 'No se pudo buscar. Intenta de nuevo.'))
           }
         })
         .finally(() => setSearching(false))
@@ -78,8 +83,8 @@ export function ClientView() {
       await addSong(song, mesa.trim() || undefined)
       setToast(song.title)
       window.setTimeout(() => setToast(null), 2200)
-    } catch {
-      setToast('No se pudo agregar, intenta de nuevo')
+    } catch (err) {
+      setToast(messageFromUnknown(err, 'No se pudo agregar, intenta de nuevo'))
       window.setTimeout(() => setToast(null), 2200)
     }
   }

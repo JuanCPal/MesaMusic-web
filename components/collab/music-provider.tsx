@@ -75,28 +75,65 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const mineIdsRef = useRef<Set<string>>(loadMineIds())
   const socketRef = useRef<WebSocket | null>(null)
   const currentEntryIdRef = useRef<string | null>(null)
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectAttemptsRef = useRef(0)
 
   // Carga el estado inicial por REST y abre el WebSocket para las actualizaciones en vivo.
   useEffect(() => {
     let cancelled = false
 
-    fetchQueueState()
-      .then((state) => {
-        if (!cancelled) setRawState(state)
-      })
-      .catch(() => {
-        // si falla la carga inicial, el WebSocket eventualmente trae el estado igual
-      })
+    const syncState = () => {
+      fetchQueueState()
+        .then((state) => {
+          if (!cancelled) setRawState(state)
+        })
+        .catch(() => {
+          // si falla la carga por REST, el WebSocket puede traer el estado luego
+        })
+    }
 
-    const socket = connectQueueSocket((state) => setRawState(state))
-    socket.onopen = () => setConnected(true)
-    socket.onclose = () => setConnected(false)
-    socket.onerror = () => setConnected(false)
-    socketRef.current = socket
+    const scheduleReconnect = () => {
+      if (cancelled || reconnectTimerRef.current) return
+      const delayMs = Math.min(1000 * 2 ** reconnectAttemptsRef.current, 10000)
+      reconnectAttemptsRef.current += 1
+      reconnectTimerRef.current = setTimeout(() => {
+        reconnectTimerRef.current = null
+        connectSocket()
+      }, delayMs)
+    }
+
+    const connectSocket = () => {
+      if (cancelled) return
+      const socket = connectQueueSocket((state) => setRawState(state))
+      socketRef.current = socket
+
+      socket.onopen = () => {
+        if (cancelled) return
+        reconnectAttemptsRef.current = 0
+        setConnected(true)
+        syncState()
+      }
+      socket.onclose = () => {
+        if (cancelled) return
+        setConnected(false)
+        scheduleReconnect()
+      }
+      socket.onerror = () => {
+        if (cancelled) return
+        setConnected(false)
+      }
+    }
+
+    syncState()
+    connectSocket()
 
     return () => {
       cancelled = true
-      socket.close()
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current)
+        reconnectTimerRef.current = null
+      }
+      socketRef.current?.close()
       socketRef.current = null
     }
   }, [])
