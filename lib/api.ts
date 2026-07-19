@@ -4,9 +4,6 @@ import type { QueueItem, Song } from './music'
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') ?? 'http://localhost:8080'
 
-const WS_URL =
-  process.env.NEXT_PUBLIC_WS_URL ?? `${API_BASE_URL.replace(/^http/, 'ws')}/ws`
-
 // --- Formas crudas tal como las devuelve el backend Go (internal/models) ---
 
 type BackendSong = {
@@ -17,10 +14,16 @@ type BackendSong = {
   durationSeconds: number
 }
 
+export type Session = {
+  id: string
+  name: string
+  status: 'active' | 'ended'
+  joinUrl: string
+}
+
 export type BackendQueueItem = {
   id: string
   song: BackendSong
-  mesa?: string
   addedAt: string
   isBackup: boolean
 }
@@ -53,7 +56,7 @@ export function toQueueItem(item: BackendQueueItem, mineIds: Set<string>): Queue
   return {
     entryId: item.id,
     song: toSong(item.song),
-    requestedBy: item.mesa && item.mesa.trim() ? item.mesa.trim() : 'Alguien',
+    requestedBy: 'Alguien',
     mine: mineIds.has(item.id),
   }
 }
@@ -72,14 +75,37 @@ export async function searchSongs(query: string, signal?: AbortSignal): Promise<
   return data.results.map(toSong)
 }
 
-export async function addSongToQueue(
-  videoId: string,
-  mesa?: string,
-): Promise<BackendQueueItem> {
-  const res = await fetch(`${API_BASE_URL}/api/queue`, {
+export async function createSession(name: string): Promise<Session> {
+  const res = await fetch(`${API_BASE_URL}/api/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ videoId, mesa }),
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error ?? 'Error creando la sesión')
+  }
+  return res.json()
+}
+
+export async function getSession(sessionId: string): Promise<Session> {
+  const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`)
+  if (!res.ok) throw new Error('Sesión no encontrada')
+  return res.json()
+}
+
+export function getQrImageUrl(sessionId: string): string {
+  return `${API_BASE_URL}/api/sessions/${sessionId}/qr`
+}
+
+export async function addSongToQueue(
+  sessionId: string,
+  videoId: string,
+): Promise<BackendQueueItem> {
+  const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/queue`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ videoId }),
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
@@ -88,20 +114,27 @@ export async function addSongToQueue(
   return res.json()
 }
 
-export async function fetchQueueState(): Promise<BackendQueueState> {
-  const res = await fetch(`${API_BASE_URL}/api/queue`)
+export async function fetchQueueState(sessionId: string): Promise<BackendQueueState> {
+  const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/queue`)
   if (!res.ok) throw new Error('Error obteniendo el estado de la cola')
   return res.json()
 }
 
 // --- WebSocket ---
 
+function wsUrlFor(sessionId: string): string {
+  return `${API_BASE_URL.replace(/^http/, 'ws')}/api/sessions/${sessionId}/ws`
+}
+
 /**
  * Abre la conexión de tiempo real. onState se llama con cada actualización
  * que el backend transmite cuando la cola cambia.
  */
-export function connectQueueSocket(onState: (state: BackendQueueState) => void): WebSocket {
-  const socket = new WebSocket(WS_URL)
+export function connectQueueSocket(
+  sessionId: string,
+  onState: (state: BackendQueueState) => void,
+): WebSocket {
+  const socket = new WebSocket(wsUrlFor(sessionId))
 
   socket.onmessage = (event) => {
     try {
