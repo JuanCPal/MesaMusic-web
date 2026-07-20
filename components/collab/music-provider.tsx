@@ -43,7 +43,7 @@ type MusicContextValue = {
   queue: QueueItem[]
   /** true si el WebSocket está conectado */
   connected: boolean
-  addSong: (song: Song, mesa?: string) => Promise<void>
+  addSong: (song: Song) => Promise<void>
   /** avisa al backend que la canción actual terminó / debe saltarse */
   reportEnded: () => void
   myRequests: MyRequest[]
@@ -67,7 +67,13 @@ function saveMineIds(ids: Set<string>) {
   window.localStorage.setItem(MINE_IDS_KEY, JSON.stringify([...ids]))
 }
 
-export function MusicProvider({ children }: { children: React.ReactNode }) {
+export function MusicProvider({
+  sessionId,
+  children,
+}: {
+  sessionId: string
+  children: React.ReactNode
+}) {
   const [rawState, setRawState] = useState<BackendQueueState>(EMPTY_STATE)
   const [connected, setConnected] = useState(false)
   const [elapsed, setElapsed] = useState(0)
@@ -83,7 +89,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false
 
     const syncState = () => {
-      fetchQueueState()
+      fetchQueueState(sessionId)
         .then((state) => {
           if (!cancelled) setRawState(state)
         })
@@ -104,7 +110,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
 
     const connectSocket = () => {
       if (cancelled) return
-      const socket = connectQueueSocket((state) => setRawState(state))
+      const socket = connectQueueSocket(sessionId, (state) => setRawState(state))
       socketRef.current = socket
 
       socket.onopen = () => {
@@ -136,7 +142,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       socketRef.current?.close()
       socketRef.current = null
     }
-  }, [])
+  }, [sessionId])
 
   // Reloj visual local (solo para la barra de progreso del cliente): se
   // reinicia cada vez que cambia la entrada que está sonando.
@@ -161,10 +167,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     if (!rawState.nowPlaying) return null
     return {
       song: toSong(rawState.nowPlaying.song),
-      requestedBy:
-        rawState.nowPlaying.mesa && rawState.nowPlaying.mesa.trim()
-          ? rawState.nowPlaying.mesa.trim()
-          : 'la casa',
+      requestedBy: 'la casa',
       isBackup: rawState.nowPlaying.isBackup,
     }
   }, [rawState.nowPlaying])
@@ -189,13 +192,13 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     return result
   }, [rawState.queue, rawState.estimatedWaitSecs])
 
-  const addSong = useCallback(async (song: Song, mesa?: string) => {
-    const created = await addSongToQueue(song.id, mesa)
+  const addSong = useCallback(async (song: Song) => {
+    const created = await addSongToQueue(sessionId, song.id)
     mineIdsRef.current.add(created.id)
     saveMineIds(mineIdsRef.current)
     // No hace falta actualizar rawState manualmente: el backend hace
     // broadcast por WebSocket y ese mensaje trae el estado ya actualizado.
-  }, [])
+  }, [sessionId])
 
   const reportEnded = useCallback(() => {
     notifyEnded(socketRef.current)
