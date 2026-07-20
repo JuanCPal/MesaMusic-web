@@ -17,8 +17,6 @@ import { searchSongs } from '@/lib/api'
 import { useMusic } from './music-provider'
 import { ProgressBar } from './progress-bar'
 
-const MESA_KEY = 'sintonia-mesa'
-
 export function ClientView() {
   const { nowPlaying, elapsed, addSong, myRequests, connected } = useMusic()
   const [query, setQuery] = useState('')
@@ -26,24 +24,12 @@ export function ClientView() {
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
-  const [mesa, setMesa] = useState('')
 
   const abortRef = useRef<AbortController | null>(null)
 
   function messageFromUnknown(err: unknown, fallback: string): string {
     if (err instanceof Error && err.message.trim()) return err.message
     return fallback
-  }
-
-  // Recuerda el nombre/mesa entre visitas en el mismo dispositivo
-  useEffect(() => {
-    const saved = window.localStorage.getItem(MESA_KEY)
-    if (saved) setMesa(saved)
-  }, [])
-
-  function handleMesaChange(value: string) {
-    setMesa(value)
-    window.localStorage.setItem(MESA_KEY, value)
   }
 
   // Búsqueda contra el backend, con debounce para no gastar cuota de la API en cada tecla
@@ -80,7 +66,7 @@ export function ClientView() {
 
   async function handleAdd(song: Song) {
     try {
-      await addSong(song, mesa.trim() || undefined)
+      await addSong(song)
       setToast(song.title)
       window.setTimeout(() => setToast(null), 2200)
     } catch (err) {
@@ -107,15 +93,6 @@ export function ClientView() {
             </p>
           </div>
         </div>
-
-        <input
-          type="text"
-          value={mesa}
-          onChange={(e) => handleMesaChange(e.target.value)}
-          placeholder="Tu nombre o mesa (opcional)"
-          aria-label="Tu nombre o mesa"
-          className="mb-2 h-9 w-full rounded-lg border border-input bg-secondary px-3 text-xs text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
-        />
 
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
