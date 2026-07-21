@@ -8,6 +8,7 @@ import {
   Play,
   Radio,
   SkipForward,
+  Trash2,
 } from 'lucide-react'
 import { formatDuration } from '@/lib/music'
 import { useMusic } from './music-provider'
@@ -42,13 +43,15 @@ function loadYouTubeScript(): Promise<void> {
 }
 
 export function PanelView() {
-  const { nowPlaying, queue, connected, reportEnded } = useMusic()
+  const { nowPlaying, queue, connected, reportEnded, skipCurrent, removeItem } = useMusic()
 
   const playerRef = useRef<any>(null)
   const [playerReady, setPlayerReady] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [playerElapsed, setPlayerElapsed] = useState(0)
+  const [removingEntryIds, setRemovingEntryIds] = useState<Set<string>>(new Set())
   const loadedVideoIdRef = useRef<string | null>(null)
+  const removingEntryIdsRef = useRef<Set<string>>(new Set())
 
   // Inicializa el player una sola vez
   useEffect(() => {
@@ -120,10 +123,27 @@ export function PanelView() {
   }, [isPlaying])
 
   const skip = useCallback(() => {
-    // Le avisamos directo al backend que "terminó" para forzar el avance;
-    // cuando llegue el nuevo nowPlaying, el efecto de arriba carga el video.
-    reportEnded()
-  }, [reportEnded])
+    void skipCurrent()
+  }, [skipCurrent])
+
+  const removeFromQueue = useCallback(async (entryId: string) => {
+    if (removingEntryIdsRef.current.has(entryId)) return
+
+    const confirmed = window.confirm('Eliminar esta canción de la cola?')
+    if (!confirmed) return
+
+    removingEntryIdsRef.current.add(entryId)
+    setRemovingEntryIds(new Set(removingEntryIdsRef.current))
+
+    try {
+      await removeItem(entryId)
+    } catch {
+      // El estado se resincroniza por WebSocket/reconexión; evitamos romper la UI.
+    } finally {
+      removingEntryIdsRef.current.delete(entryId)
+      setRemovingEntryIds(new Set(removingEntryIdsRef.current))
+    }
+  }, [removeItem])
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background lg:flex-row">
@@ -263,6 +283,15 @@ export function PanelView() {
                 <span className="flex-none font-mono text-xs text-muted-foreground">
                   {formatDuration(item.song.duration)}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => void removeFromQueue(item.entryId)}
+                  disabled={removingEntryIds.has(item.entryId)}
+                  aria-label="Eliminar canción de la cola"
+                  className="flex size-8 flex-none items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Trash2 className="size-4" />
+                </button>
               </li>
             ))}
           </ol>
