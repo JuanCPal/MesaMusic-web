@@ -1,15 +1,18 @@
 'use client'
 
 import { useState } from 'react'
+import { QrCode } from 'lucide-react'
 import { MusicProvider } from '@/components/collab/music-provider'
 import { PanelView } from '@/components/collab/panel-view'
-import { createSession, getQrImageUrl, type Session } from '@/lib/api'
+import { SessionQrModal } from '@/components/collab/session-qr-modal'
+import { createSession, type Session } from '@/lib/api'
 
 export default function Page() {
   const [session, setSession] = useState<Session | null>(null)
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [qrOpen, setQrOpen] = useState(false)
 
   const handleCreate = async () => {
     setCreating(true)
@@ -43,10 +46,16 @@ export default function Page() {
   return (
     <MusicProvider sessionId={session.id}>
       <div className="p-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={getQrImageUrl(session.id)} alt="QR de la sesión" />
-        <p>{session.joinUrl}</p>
+        <button
+          type="button"
+          onClick={() => setQrOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-card-foreground transition-colors hover:bg-secondary"
+        >
+          <QrCode className="size-4" />
+          Mostrar código QR
+        </button>
       </div>
+      <SessionQrModal session={session} open={qrOpen} onClose={() => setQrOpen(false)} />
       <PanelView />
     </MusicProvider>
   )
