@@ -54,7 +54,7 @@ type MusicContextValue = {
 }
 
 const MusicContext = createContext<MusicContextValue | null>(null)
-const MINE_IDS_KEY = 'sintonia-mine-ids'
+const MINE_IDS_KEY = 'mesamusic-mine-ids'
 
 function loadMineIds(): Set<string> {
   if (typeof window === 'undefined') return new Set()

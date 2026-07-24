@@ -61,13 +61,13 @@ export function SessionQrModal({ session, open, onClose }: SessionQrModalProps) 
           <div>
             <p className="text-base font-semibold text-card-foreground">Invitar a la sesión</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Escaneá este código o compartí el link para unirte a la sesión.
+              Escanea este código o comparte el link para unirte a la sesión.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="ml-3 inline-flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            className="ml-3 inline-flex size-8 cursor-pointer items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             aria-label="Cerrar modal"
           >
             <X className="size-4" />

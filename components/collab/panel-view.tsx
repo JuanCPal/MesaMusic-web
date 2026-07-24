@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  ChevronLeft,
+  ChevronRight,
   ListMusic,
   Music2,
   Pause,
   Play,
+  QrCode,
   Radio,
   SkipForward,
   Trash2,
@@ -25,6 +28,10 @@ declare global {
 
 const PLAYER_ELEMENT_ID = 'yt-player'
 
+type PanelViewProps = {
+  onInviteClick?: () => void
+}
+
 function loadYouTubeScript(): Promise<void> {
   return new Promise((resolve) => {
     if (window.YT && window.YT.Player) {
@@ -42,13 +49,14 @@ function loadYouTubeScript(): Promise<void> {
   })
 }
 
-export function PanelView() {
+export function PanelView({ onInviteClick }: PanelViewProps) {
   const { nowPlaying, queue, connected, reportEnded, skipCurrent, removeItem } = useMusic()
 
   const playerRef = useRef<any>(null)
   const [playerReady, setPlayerReady] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [playerElapsed, setPlayerElapsed] = useState(0)
+  const [isQueueVisible, setIsQueueVisible] = useState(true)
   const [removingEntryIds, setRemovingEntryIds] = useState<Set<string>>(new Set())
   const loadedVideoIdRef = useRef<string | null>(null)
   const removingEntryIdsRef = useRef<Set<string>>(new Set())
@@ -155,20 +163,42 @@ export function PanelView() {
               <Music2 className="size-6" />
             </span>
             <div className="leading-tight">
-              <p className="text-lg font-semibold">Sintonía</p>
+              <p className="text-lg font-semibold">MesaMusic</p>
             </div>
           </div>
-          <span className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground">
-            <span className="relative flex size-2">
-              {connected ? (
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
-              ) : null}
-              <span
-                className={`relative inline-flex size-2 rounded-full ${connected ? 'bg-primary' : 'bg-muted-foreground/50'}`}
-              />
+          <div className="flex items-center gap-2">
+            {onInviteClick ? (
+              <button
+                type="button"
+                onClick={onInviteClick}
+                className="inline-flex items-center gap-2 rounded-full cursor-pointer bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition hover:brightness-95"
+              >
+                <QrCode className="size-4" />
+                Invitar más personas
+              </button>
+            ) : null}
+            {!isQueueVisible ? (
+              <button
+                type="button"
+                onClick={() => setIsQueueVisible(true)}
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              >
+                <ChevronLeft className="size-4" />
+                Mostrar cola
+              </button>
+            ) : null}
+            <span className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground">
+              <span className="relative flex size-2">
+                {connected ? (
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
+                ) : null}
+                <span
+                  className={`relative inline-flex size-2 rounded-full ${connected ? 'bg-primary' : 'bg-muted-foreground/50'}`}
+                />
+              </span>
+              {connected ? 'En vivo' : 'Conectando…'}
             </span>
-            {connected ? 'En vivo' : 'Conectando…'}
-          </span>
+          </div>
         </header>
 
         {/* Indicador Sonando ahora */}
@@ -239,63 +269,77 @@ export function PanelView() {
       </section>
 
       {/* Barra lateral: cola */}
-      <aside className="w-full border-t border-border bg-sidebar px-6 py-6 lg:w-96 lg:border-l lg:border-t-0 lg:px-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-base font-semibold">
-            <ListMusic className="size-5 text-primary" />
-            En cola
-          </h2>
-          <span className="rounded-full bg-secondary px-2.5 py-0.5 text-sm font-medium text-secondary-foreground">
-            {queue.length}
-          </span>
-        </div>
-
-        {queue.length === 0 ? (
-          <p className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-            La cola está vacía. Escanea el QR para agregar canciones.
-          </p>
-        ) : (
-          <ol className="space-y-2">
-            {queue.map((item, index) => (
-              <li
-                key={item.entryId}
-                className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5"
+      <aside
+        className={`overflow-hidden bg-sidebar transition-all duration-300 ease-out ${isQueueVisible ? 'w-full border-t border-border px-6 py-6 lg:w-96 lg:border-l lg:border-t-0 lg:px-6' : 'w-0 border-0 px-0 py-0'}`}
+      >
+        <div className={`transition-opacity duration-200 ${isQueueVisible ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-base font-semibold">
+              <ListMusic className="size-5 text-primary" />
+              En cola
+            </h2>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-secondary px-2.5 py-0.5 text-sm font-medium text-secondary-foreground">
+                {queue.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsQueueVisible(false)}
+                className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                aria-label="Ocultar cola"
               >
-                <span className="w-5 flex-none text-center font-mono text-sm text-muted-foreground">
-                  {index + 1}
-                </span>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={item.song.thumbnail || '/placeholder.svg'}
-                  alt=""
-                  width={44}
-                  height={44}
-                  className="size-11 flex-none rounded-md object-cover"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-card-foreground">
-                    {item.song.title}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {item.song.channel} · pedida por {item.requestedBy}
-                  </p>
-                </div>
-                <span className="flex-none font-mono text-xs text-muted-foreground">
-                  {formatDuration(item.song.duration)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void removeFromQueue(item.entryId)}
-                  disabled={removingEntryIds.has(item.entryId)}
-                  aria-label="Eliminar canción de la cola"
-                  className="flex size-8 flex-none items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+          </div>
+
+          {queue.length === 0 ? (
+            <p className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+              La cola está vacía. Escanea el QR para agregar canciones.
+            </p>
+          ) : (
+            <ol className="space-y-2">
+              {queue.map((item, index) => (
+                <li
+                  key={item.entryId}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5"
                 >
-                  <Trash2 className="size-4" />
-                </button>
-              </li>
-            ))}
-          </ol>
-        )}
+                  <span className="w-5 flex-none text-center font-mono text-sm text-muted-foreground">
+                    {index + 1}
+                  </span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.song.thumbnail || '/placeholder.svg'}
+                    alt=""
+                    width={44}
+                    height={44}
+                    className="size-11 flex-none rounded-md object-cover"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-card-foreground">
+                      {item.song.title}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {item.song.channel} · pedida por {item.requestedBy}
+                    </p>
+                  </div>
+                  <span className="flex-none font-mono text-xs text-muted-foreground">
+                    {formatDuration(item.song.duration)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void removeFromQueue(item.entryId)}
+                    disabled={removingEntryIds.has(item.entryId)}
+                    aria-label="Eliminar canción de la cola"
+                    className="flex size-8 flex-none items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
       </aside>
     </div>
   )

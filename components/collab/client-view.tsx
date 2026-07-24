@@ -84,7 +84,7 @@ export function ClientView() {
             <Music2 className="size-5" />
           </span>
           <div className="leading-tight">
-            <p className="text-sm font-semibold">Sintonía</p>
+            <p className="text-sm font-semibold">MesaMusic</p>
             <p className="flex items-center gap-1 text-xs text-muted-foreground">
               <span
                 className={`size-1.5 rounded-full ${connected ? 'bg-primary' : 'bg-muted-foreground/50'}`}
