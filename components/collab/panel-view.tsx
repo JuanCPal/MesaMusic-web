@@ -5,15 +5,16 @@ import {
   ChevronLeft,
   ChevronRight,
   ListMusic,
-  Music2,
+  Maximize2,
+  Minimize2,
   Pause,
   Play,
   QrCode,
-  Radio,
   SkipForward,
   Trash2,
 } from 'lucide-react'
 import { formatDuration } from '@/lib/music'
+import { BrandLogo } from './brand-logo'
 import { useMusic } from './music-provider'
 import { ProgressBar } from './progress-bar'
 
@@ -53,13 +54,83 @@ export function PanelView({ onInviteClick }: PanelViewProps) {
   const { nowPlaying, queue, connected, reportEnded, skipCurrent, removeItem } = useMusic()
 
   const playerRef = useRef<any>(null)
+  const playerContainerRef = useRef<HTMLDivElement | null>(null)
   const [playerReady, setPlayerReady] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const [playerElapsed, setPlayerElapsed] = useState(0)
   const [isQueueVisible, setIsQueueVisible] = useState(true)
   const [removingEntryIds, setRemovingEntryIds] = useState<Set<string>>(new Set())
   const loadedVideoIdRef = useRef<string | null>(null)
   const removingEntryIdsRef = useRef<Set<string>>(new Set())
+
+  const getFullscreenElement = useCallback((): Element | null => {
+    return document.fullscreenElement ?? (document as any).webkitFullscreenElement ?? null
+  }, [])
+
+  const requestElementFullscreen = useCallback(async (element: HTMLElement) => {
+    if (element.requestFullscreen) {
+      await element.requestFullscreen()
+      return
+    }
+    const webkitRequestFullscreen = (element as any).webkitRequestFullscreen as
+      | (() => Promise<void> | void)
+      | undefined
+    if (webkitRequestFullscreen) {
+      await webkitRequestFullscreen.call(element)
+    }
+  }, [])
+
+  const exitDocumentFullscreen = useCallback(async () => {
+    if (document.exitFullscreen) {
+      await document.exitFullscreen()
+      return
+    }
+    const webkitExitFullscreen = (document as any).webkitExitFullscreen as
+      | (() => Promise<void> | void)
+      | undefined
+    if (webkitExitFullscreen) {
+      await webkitExitFullscreen.call(document)
+    }
+  }, [])
+
+  const toggleFullscreen = useCallback(async () => {
+    const activeFullscreen = getFullscreenElement()
+    if (activeFullscreen) {
+      try {
+        await exitDocumentFullscreen()
+      } catch {
+        // Ignoramos errores transitorios del navegador.
+      }
+      return
+    }
+
+    const iframe = playerRef.current?.getIframe?.()
+    const fullscreenTarget =
+      iframe instanceof HTMLElement ? iframe : playerContainerRef.current
+
+    if (!fullscreenTarget) return
+
+    try {
+      await requestElementFullscreen(fullscreenTarget)
+    } catch {
+      // Algunos navegadores pueden bloquear fullscreen por políticas de usuario.
+    }
+  }, [exitDocumentFullscreen, getFullscreenElement, requestElementFullscreen])
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(Boolean(getFullscreenElement()))
+    }
+
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    document.addEventListener('webkitfullscreenchange' as any, onFullscreenChange)
+
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange)
+      document.removeEventListener('webkitfullscreenchange' as any, onFullscreenChange)
+    }
+  }, [getFullscreenElement])
 
   // Inicializa el player una sola vez
   useEffect(() => {
@@ -77,7 +148,12 @@ export function PanelView({ onInviteClick }: PanelViewProps) {
           rel: 0,
         },
         events: {
-          onReady: () => setPlayerReady(true),
+          onReady: () => {
+            const iframe = playerRef.current?.getIframe?.() as HTMLIFrameElement | undefined
+            iframe?.setAttribute('allowfullscreen', 'true')
+            iframe?.setAttribute('allow', 'autoplay; fullscreen')
+            setPlayerReady(true)
+          },
           onStateChange: (event: any) => {
             const YT = window.YT
             if (event.data === YT.PlayerState.PLAYING) setIsPlaying(true)
@@ -154,16 +230,18 @@ export function PanelView({ onInviteClick }: PanelViewProps) {
   }, [removeItem])
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-background lg:flex-row">
+    <div className="flex h-dvh w-full flex-col overflow-hidden bg-background lg:flex-row">
       {/* Zona principal: reproductor */}
-      <section className="flex flex-1 flex-col px-6 py-6 lg:px-10 lg:py-8">
-        <header className="mb-6 flex items-center justify-between">
+      <section className="flex min-h-0 flex-1 flex-col px-4 py-2 lg:px-8 lg:py-6">
+        <header className="mb-4 flex shrink-0 items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <Music2 className="size-6" />
+            <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary-foreground">
+              <BrandLogo className="size-11" />
             </span>
             <div className="leading-tight">
-              <p className="text-lg font-semibold">MesaMusic</p>
+              <div className='flex gap-1'><p className="text-lg font-semibold text-chart-5">mesamusic<span className='text-chart-3'>.co </span></p> <div className="mb-1 inline-flex items-center gap-2 rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-chart-5/80">
+                BETA
+              </div> </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -171,7 +249,7 @@ export function PanelView({ onInviteClick }: PanelViewProps) {
               <button
                 type="button"
                 onClick={onInviteClick}
-                className="inline-flex items-center gap-2 rounded-full cursor-pointer bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition hover:brightness-95"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition hover:brightness-95"
               >
                 <QrCode className="size-4" />
                 Invitar más personas
@@ -184,7 +262,7 @@ export function PanelView({ onInviteClick }: PanelViewProps) {
                 className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
               >
                 <ChevronLeft className="size-4" />
-                Mostrar cola
+                Ver lista
               </button>
             ) : null}
             <span className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground">
@@ -201,21 +279,13 @@ export function PanelView({ onInviteClick }: PanelViewProps) {
           </div>
         </header>
 
-        {/* Indicador Sonando ahora */}
-        <div className="mb-4 flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-primary">
-          <Radio className="size-4" />
-          <span>Sonando ahora</span>
-          {nowPlaying ? (
-            <span className="ml-1 truncate font-normal normal-case text-muted-foreground">
-              · pedida por {nowPlaying.requestedBy}
-            </span>
-          ) : null}
-        </div>
-
-        <div className="flex flex-1 flex-col items-center justify-center">
-          <div className="w-full max-w-xl">
+        <div className="flex min-h-0 flex-1 items-start justify-center">
+          <div className="w-full max-w-4xl">
             {/* Reproductor real de YouTube */}
-            <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-border bg-card">
+            <div
+              ref={playerContainerRef}
+              className="relative aspect-video w-full overflow-hidden rounded-2xl border border-border bg-card"
+            >
               <div id={PLAYER_ELEMENT_ID} className="absolute inset-0" />
               {!nowPlaying ? (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/80 text-sm text-muted-foreground">
@@ -223,56 +293,15 @@ export function PanelView({ onInviteClick }: PanelViewProps) {
                 </div>
               ) : null}
             </div>
-
-            <div className="mt-6 text-center">
-              <h1 className="text-balance text-3xl font-bold tracking-tight lg:text-4xl">
-                {nowPlaying?.song.title ?? '—'}
-              </h1>
-              <p className="mt-1 text-lg text-muted-foreground">
-                {nowPlaying?.song.channel ?? ''}
-              </p>
-            </div>
-
-            <ProgressBar
-              className="mx-auto mt-6 max-w-lg"
-              elapsed={playerElapsed}
-              duration={nowPlaying?.song.duration ?? 0}
-              barClassName="h-2"
-            />
-
-            <div className="mt-6 flex items-center justify-center gap-4">
-              <button
-                type="button"
-                onClick={togglePlay}
-                disabled={!nowPlaying}
-                aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
-                className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform hover:scale-105 disabled:opacity-40"
-              >
-                {isPlaying ? (
-                  <Pause className="size-6" />
-                ) : (
-                  <Play className="size-6 translate-x-0.5" />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={skip}
-                disabled={!nowPlaying}
-                aria-label="Siguiente canción"
-                className="flex size-12 items-center justify-center rounded-full border border-border bg-card text-foreground transition-colors hover:bg-secondary disabled:opacity-40"
-              >
-                <SkipForward className="size-5" />
-              </button>
-            </div>
           </div>
         </div>
       </section>
 
       {/* Barra lateral: cola */}
       <aside
-        className={`overflow-hidden bg-sidebar transition-all duration-300 ease-out ${isQueueVisible ? 'w-full border-t border-border px-6 py-6 lg:w-96 lg:border-l lg:border-t-0 lg:px-6' : 'w-0 border-0 px-0 py-0'}`}
+        className={`fixed inset-y-0 right-0 z-40 w-full max-w-sm overflow-hidden border-l border-border bg-sidebar transition-all duration-300 ease-out ${isQueueVisible ? 'translate-x-0' : 'translate-x-full'} lg:static lg:inset-auto lg:z-auto lg:max-w-none lg:translate-x-0 ${isQueueVisible ? 'lg:w-96' : 'lg:w-0 lg:border-l-0'}`}
       >
-        <div className={`transition-opacity duration-200 ${isQueueVisible ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
+        <div className={`flex h-full min-h-0 flex-col p-6 transition-opacity duration-200 ${isQueueVisible ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
           <div className="mb-4 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-base font-semibold">
               <ListMusic className="size-5 text-primary" />
@@ -298,7 +327,7 @@ export function PanelView({ onInviteClick }: PanelViewProps) {
               La cola está vacía. Escanea el QR para agregar canciones.
             </p>
           ) : (
-            <ol className="space-y-2">
+            <ol className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
               {queue.map((item, index) => (
                 <li
                   key={item.entryId}
@@ -341,6 +370,72 @@ export function PanelView({ onInviteClick }: PanelViewProps) {
           )}
         </div>
       </aside>
+
+      <div
+        className={`fixed bottom-4 left-4 right-4 z-30 sm:left-6 sm:right-6 lg:left-8 ${isQueueVisible ? 'lg:right-104' : 'lg:right-8'}`}
+      >
+        <div className="mx-auto w-full max-w-4xl rounded-xl border border-border/80 bg-card/90 px-3 py-3 shadow-2xl backdrop-blur">
+          <ProgressBar
+            className="w-full"
+            elapsed={playerElapsed}
+            duration={nowPlaying?.song.duration ?? 0}
+            barClassName="h-2"
+          />
+
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-2xl font-semibold text-card-foreground lg:text-2xl">
+                {nowPlaying?.song.title ?? 'Esperando reproducción'}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {nowPlaying
+                  ? `${nowPlaying.song.channel} · pedida por ${nowPlaying.requestedBy}`
+                  : 'La cola está vacía por ahora'}
+              </p>
+            </div>
+
+            <div className="flex flex-none items-center gap-2">
+              <button
+                type="button"
+                onClick={togglePlay}
+                disabled={!nowPlaying}
+                aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
+                className="inline-flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isPlaying ? (
+                  <Pause className="size-6" />
+                ) : (
+                  <Play className="size-6" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={skip}
+                disabled={!nowPlaying}
+                aria-label="Siguiente canción"
+                className="inline-flex size-11 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <SkipForward className="size-5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void toggleFullscreen()}
+                disabled={!playerReady}
+                aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+                className="inline-flex size-11 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isFullscreen ? (
+                  <Minimize2 className="size-5" />
+                ) : (
+                  <Maximize2 className="size-5" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

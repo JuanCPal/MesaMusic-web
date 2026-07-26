@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Music2, QrCode, Radio, Sparkles } from 'lucide-react'
 import { MusicProvider } from '@/components/collab/music-provider'
+import { BrandLogo } from '@/components/collab/brand-logo'
 import { PanelView } from '@/components/collab/panel-view'
 import { SessionQrModal } from '@/components/collab/session-qr-modal'
 import { createSession, type Session } from '@/lib/api'
@@ -47,11 +48,14 @@ export default function Page() {
           <div className="grid gap-6 md:grid-cols-[1.2fr_1fr] md:items-center">
             <section className="rounded-2xl border border-border/70 bg-card/80 p-5 shadow-sm backdrop-blur sm:p-6">
               <div className="mb-5 flex items-center gap-3">
-                <span className="flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                  <Music2 className="size-6" />
+                <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary-foreground">
+                  <BrandLogo className="size-11" />
                 </span>
                 <div>
-                  <p className="text-sm font-medium text-primary">MesaMusic <span className='text-zinc-500'> | </span><span className='text-blue-400 font-mono text-[10px]'> BETA</span></p>
+                  <div className='flex gap-1'><p className="text-sm font-medium text-primary">mesamusic<span className='text-chart-4'>.co </span></p> <div className="mb-0 inline-flex items-center gap-2 rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-chart-5/80">
+                <Sparkles className="size-3.5 hidden text-primary" />
+                 BETA
+              </div></div>
                   <p className="text-xs text-muted-foreground">Sesion colaborativa en segundos</p>
                 </div>
               </div>
@@ -88,7 +92,7 @@ export default function Page() {
             <aside className="rounded-2xl border border-border/70 bg-card/70 p-5 shadow-sm backdrop-blur sm:p-6">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
                 <Sparkles className="size-3.5 text-primary" />
-                Listo para beta
+                Todo listo
               </div>
               <ul className="space-y-3 text-sm text-card-foreground">
                 <li className="flex items-start gap-2">
