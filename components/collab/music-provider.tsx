@@ -16,6 +16,8 @@ import {
   connectQueueSocket,
   fetchQueueState,
   notifyEnded,
+  removeQueueItem,
+  skipCurrentTrack,
   toQueueItem,
   toSong,
   type BackendQueueState,
@@ -44,13 +46,15 @@ type MusicContextValue = {
   /** true si el WebSocket está conectado */
   connected: boolean
   addSong: (song: Song) => Promise<void>
+  skipCurrent: () => Promise<void>
+  removeItem: (entryId: string) => Promise<void>
   /** avisa al backend que la canción actual terminó / debe saltarse */
   reportEnded: () => void
   myRequests: MyRequest[]
 }
 
 const MusicContext = createContext<MusicContextValue | null>(null)
-const MINE_IDS_KEY = 'sintonia-mine-ids'
+const MINE_IDS_KEY = 'mesamusic-mine-ids'
 
 function loadMineIds(): Set<string> {
   if (typeof window === 'undefined') return new Set()
@@ -200,13 +204,43 @@ export function MusicProvider({
     // broadcast por WebSocket y ese mensaje trae el estado ya actualizado.
   }, [sessionId])
 
+  const skipCurrent = useCallback(async () => {
+    await skipCurrentTrack(sessionId)
+    // No hace falta actualizar rawState manualmente: el estado llega por WebSocket.
+  }, [sessionId])
+
+  const removeItem = useCallback(async (entryId: string) => {
+    await removeQueueItem(sessionId, entryId)
+    // No hace falta actualizar rawState manualmente: el estado llega por WebSocket.
+  }, [sessionId])
+
   const reportEnded = useCallback(() => {
     notifyEnded(socketRef.current)
   }, [])
 
   const value = useMemo<MusicContextValue>(
-    () => ({ nowPlaying, elapsed, queue, connected, addSong, reportEnded, myRequests }),
-    [nowPlaying, elapsed, queue, connected, addSong, reportEnded, myRequests],
+    () => ({
+      nowPlaying,
+      elapsed,
+      queue,
+      connected,
+      addSong,
+      skipCurrent,
+      removeItem,
+      reportEnded,
+      myRequests,
+    }),
+    [
+      nowPlaying,
+      elapsed,
+      queue,
+      connected,
+      addSong,
+      skipCurrent,
+      removeItem,
+      reportEnded,
+      myRequests,
+    ],
   )
 
   return <MusicContext.Provider value={value}>{children}</MusicContext.Provider>

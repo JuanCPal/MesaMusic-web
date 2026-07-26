@@ -120,6 +120,26 @@ export async function fetchQueueState(sessionId: string): Promise<BackendQueueSt
   return res.json()
 }
 
+export async function skipCurrentTrack(sessionId: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/skip`, {
+    method: 'POST',
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error ?? 'Error saltando la canción actual')
+  }
+}
+
+export async function removeQueueItem(sessionId: string, itemId: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/queue/${itemId}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error ?? 'Error eliminando la canción de la cola')
+  }
+}
+
 // --- WebSocket ---
 
 function wsUrlFor(sessionId: string): string {
