@@ -10,7 +10,7 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Sintonía — Música colaborativa',
+  title: 'MesaMusic — Música colaborativa',
   description:
     'Escanea, busca y agrega canciones a la cola compartida. Vota la música del lugar en tiempo real.',
   generator: 'v0.app',
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   colorScheme: 'dark',
-  themeColor: '#211a14',
+  themeColor: '#3B82F6',
 }
 
 export default function RootLayout({
