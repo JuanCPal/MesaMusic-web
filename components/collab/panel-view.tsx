@@ -4,11 +4,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
+  ImportIcon,
   ListMusic,
   Maximize2,
   Minimize2,
   Pause,
   Play,
+  PlayIcon,
   QrCode,
   SkipForward,
   Trash2,
@@ -17,6 +19,8 @@ import { formatDuration } from '@/lib/music'
 import { BrandLogo } from './brand-logo'
 import { useMusic } from './music-provider'
 import { ProgressBar } from './progress-bar'
+import { HiMiniPlay, HiMiniPause, HiPlay, HiPause } from 'react-icons/hi2'
+
 
 // Tipos mínimos del IFrame Player API de YouTube (no hay @types instalado,
 // así que declaramos solo lo que usamos).
@@ -400,12 +404,12 @@ export function PanelView({ onInviteClick }: PanelViewProps) {
                 onClick={togglePlay}
                 disabled={!nowPlaying}
                 aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
-                className="inline-flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex size-12 items-center justify-center rounded-full bg-primary-foreground text-secondary shadow-lg transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {isPlaying ? (
-                  <Pause className="size-6" />
+                  <HiPause className="size-6" />
                 ) : (
-                  <Play className="size-6" />
+                  <HiPlay className="size-6" />
                 )}
               </button>
 
