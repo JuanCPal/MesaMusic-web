@@ -1,12 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Music2, QrCode, Radio, Sparkles } from 'lucide-react'
-import { MusicProvider } from '@/components/collab/music-provider'
 import { BrandLogo } from '@/components/collab/brand-logo'
-import { PanelView } from '@/components/collab/panel-view'
-import { SessionQrModal } from '@/components/collab/session-qr-modal'
-import { createSession, type Session } from '@/lib/api'
+import { createSession } from '@/lib/api'
 
 function suggestedSessionName(now = new Date()): string {
   const hh = String(now.getHours()).padStart(2, '0')
@@ -15,30 +13,26 @@ function suggestedSessionName(now = new Date()): string {
 }
 
 export default function Page() {
-  const [session, setSession] = useState<Session | null>(null)
+  const router = useRouter()
   const [name, setName] = useState(() => suggestedSessionName())
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [qrOpen, setQrOpen] = useState(false)
 
   const handleCreate = async () => {
     setCreating(true)
     setError(null)
     try {
       const s = await createSession(name.trim() || 'Sesión sin nombre')
-      setSession(s)
-      setQrOpen(true)
+      router.push(`/panel/${s.id}?invite=1`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error creando la sesión')
-    } finally {
       setCreating(false)
     }
   }
 
-  if (!session) {
-    return (
-      <div className="relative min-h-screen overflow-hidden bg-background">
-        <div className="pointer-events-none absolute inset-0">
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-background">
+      <div className="pointer-events-none absolute inset-0">
           <div className="absolute -left-20 -top-24 h-56 w-56 rounded-full bg-primary/15 blur-3xl" />
           <div className="absolute -right-20 top-24 h-56 w-56 rounded-full bg-secondary/70 blur-3xl" />
           <div className="absolute bottom-0 left-1/2 h-56 w-56 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
@@ -112,13 +106,5 @@ export default function Page() {
           </div>
         </main>
       </div>
-    )
-  }
-
-  return (
-    <MusicProvider sessionId={session.id}>
-      <SessionQrModal session={session} open={qrOpen} onClose={() => setQrOpen(false)} />
-      <PanelView onInviteClick={() => setQrOpen(true)} />
-    </MusicProvider>
   )
 }
