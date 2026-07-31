@@ -7,13 +7,13 @@ import {
   Clock3,
   ListMusic,
   Loader2,
-  Music2,
   Plus,
   Search,
   Volume2,
 } from 'lucide-react'
 import { formatDuration, formatWait, type Song } from '@/lib/music'
 import { searchSongs } from '@/lib/api'
+import { BrandLogo } from './brand-logo'
 import { useMusic } from './music-provider'
 import { ProgressBar } from './progress-bar'
 
@@ -80,11 +80,16 @@ export function ClientView() {
       {/* Encabezado + búsqueda */}
       <header className="sticky top-0 z-20 border-b border-border bg-background/85 px-4 pb-3 pt-4 backdrop-blur-md">
         <div className="mb-3 flex items-center gap-2">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Music2 className="size-5" />
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary-foreground">
+            <BrandLogo className="size-8" />
           </span>
           <div className="leading-tight">
-            <p className="text-sm font-semibold">Sintonía</p>
+            <div className='flex gap-1'>
+              <p className="text-sm font-semibold text-chart-5">mesamusic<span className='text-chart-3'>.co </span></p>
+              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-chart-5/80">
+                 BETA
+              </div>
+            </div>
             <p className="flex items-center gap-1 text-xs text-muted-foreground">
               <span
                 className={`size-1.5 rounded-full ${connected ? 'bg-primary' : 'bg-muted-foreground/50'}`}
