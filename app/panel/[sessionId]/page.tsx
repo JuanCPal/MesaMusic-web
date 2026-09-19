@@ -1,25 +1,37 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { MusicProvider } from '@/components/collab/music-provider'
-import { ClientView } from '@/components/collab/client-view'
+import { PanelView } from '@/components/collab/panel-view'
+import { SessionQrModal } from '@/components/collab/session-qr-modal'
 import { getSession, type Session } from '@/lib/api'
 
-export default function JoinPage() {
+export default function PanelPage() {
   const params = useParams<{ sessionId: string }>()
   const sessionId = params.sessionId
+  const router = useRouter()
 
   const [session, setSession] = useState<Session | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [qrOpen, setQrOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
 
     getSession(sessionId)
       .then((s) => {
-        if (!cancelled) setSession(s)
+        if (cancelled) return
+        setSession(s)
+
+        // Abre el QR automáticamente solo justo después de crear la sesión.
+        const url = new URL(window.location.href)
+        if (url.searchParams.get('invite') === '1') {
+          setQrOpen(true)
+          url.searchParams.delete('invite')
+          router.replace(`${url.pathname}${url.search}`)
+        }
       })
       .catch(() => {
         if (!cancelled) setError('Esta sesión no existe o ya no está disponible.')
@@ -31,7 +43,7 @@ export default function JoinPage() {
     return () => {
       cancelled = true
     }
-  }, [sessionId])
+  }, [sessionId, router])
 
   if (loading) {
     return <div className="p-4 text-center text-sm text-muted-foreground">Cargando...</div>
@@ -43,7 +55,8 @@ export default function JoinPage() {
 
   return (
     <MusicProvider sessionId={session.id}>
-      <ClientView sessionName={session.name} />
+      <SessionQrModal session={session} open={qrOpen} onClose={() => setQrOpen(false)} />
+      <PanelView sessionName={session.name} onInviteClick={() => setQrOpen(true)} />
     </MusicProvider>
   )
 }
