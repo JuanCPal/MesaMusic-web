@@ -34,6 +34,7 @@ declare global {
 const PLAYER_ELEMENT_ID = 'yt-player'
 
 type PanelViewProps = {
+  sessionName?: string
   onInviteClick?: () => void
 }
 
@@ -54,7 +55,7 @@ function loadYouTubeScript(): Promise<void> {
   })
 }
 
-export function PanelView({ onInviteClick }: PanelViewProps) {
+export function PanelView({ sessionName, onInviteClick }: PanelViewProps) {
   const { nowPlaying, queue, connected, reportEnded, skipCurrent, removeItem } = useMusic()
 
   const playerRef = useRef<any>(null)
@@ -246,6 +247,9 @@ export function PanelView({ onInviteClick }: PanelViewProps) {
               <div className='flex gap-1'><p className="text-lg font-semibold text-chart-5">mesamusic<span className='text-chart-3'>.co </span></p> <div className="mb-1 inline-flex items-center gap-2 rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-chart-5/80">
                 BETA
               </div> </div>
+              {sessionName ? (
+                <p className="truncate text-xs text-muted-foreground">{sessionName}</p>
+              ) : null}
             </div>
           </div>
           <div className="flex items-center gap-2">
