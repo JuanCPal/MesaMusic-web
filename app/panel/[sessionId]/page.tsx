@@ -56,7 +56,7 @@ export default function PanelPage() {
   return (
     <MusicProvider sessionId={session.id}>
       <SessionQrModal session={session} open={qrOpen} onClose={() => setQrOpen(false)} />
-      <PanelView onInviteClick={() => setQrOpen(true)} />
+      <PanelView sessionName={session.name} onInviteClick={() => setQrOpen(true)} />
     </MusicProvider>
   )
 }

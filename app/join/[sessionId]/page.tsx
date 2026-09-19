@@ -43,7 +43,7 @@ export default function JoinPage() {
 
   return (
     <MusicProvider sessionId={session.id}>
-      <ClientView />
+      <ClientView sessionName={session.name} />
     </MusicProvider>
   )
 }

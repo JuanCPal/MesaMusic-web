@@ -17,7 +17,7 @@ import { BrandLogo } from './brand-logo'
 import { useMusic } from './music-provider'
 import { ProgressBar } from './progress-bar'
 
-export function ClientView() {
+export function ClientView({ sessionName }: { sessionName?: string }) {
   const { nowPlaying, elapsed, addSong, myRequests, connected } = useMusic()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Song[]>([])
@@ -95,6 +95,7 @@ export function ClientView() {
                 className={`size-1.5 rounded-full ${connected ? 'bg-primary' : 'bg-muted-foreground/50'}`}
               />
               {connected ? 'Conectado' : 'Conectando…'}
+              {sessionName ? <span className="truncate">· {sessionName}</span> : null}
             </p>
           </div>
         </div>
