@@ -63,13 +63,24 @@ export function toQueueItem(item: BackendQueueItem, mineIds: Set<string>): Queue
 
 // --- REST ---
 
+// Error de API que conserva el status HTTP para que el caller pueda distinguir causas (429, 502, etc.)
+export class ApiError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
 export async function searchSongs(query: string, signal?: AbortSignal): Promise<Song[]> {
   const res = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(query)}`, {
     signal,
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(body.error ?? 'Error buscando canciones')
+    throw new ApiError(body.error ?? 'Error buscando canciones', res.status)
   }
   const data: { results: BackendSong[] } = await res.json()
   return data.results.map(toSong)
