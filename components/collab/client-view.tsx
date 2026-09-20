@@ -12,17 +12,22 @@ import {
   Volume2,
 } from 'lucide-react'
 import { formatDuration, formatWait, type Song } from '@/lib/music'
-import { searchSongs } from '@/lib/api'
+import { ApiError, searchSongs } from '@/lib/api'
 import { BrandLogo } from './brand-logo'
 import { useMusic } from './music-provider'
 import { ProgressBar } from './progress-bar'
+
+type SearchErrorState = {
+  message: string
+  kind: 'rate-limited' | 'unavailable' | 'generic'
+} | null
 
 export function ClientView({ sessionName }: { sessionName?: string }) {
   const { nowPlaying, elapsed, addSong, myRequests, connected } = useMusic()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Song[]>([])
   const [searching, setSearching] = useState(false)
-  const [searchError, setSearchError] = useState<string | null>(null)
+  const [searchError, setSearchError] = useState<SearchErrorState>(null)
   const [toast, setToast] = useState<string | null>(null)
 
   const abortRef = useRef<AbortController | null>(null)
@@ -30,6 +35,20 @@ export function ClientView({ sessionName }: { sessionName?: string }) {
   function messageFromUnknown(err: unknown, fallback: string): string {
     if (err instanceof Error && err.message.trim()) return err.message
     return fallback
+  }
+
+  function classifyError(err: unknown): SearchErrorState {
+    if (err instanceof Error && err.name === 'AbortError') return null
+    if (err instanceof ApiError && err.status === 429) {
+      return { kind: 'rate-limited', message: 'Muchas búsquedas seguidas, espera unos segundos.' }
+    }
+    if (err instanceof ApiError && err.status === 502) {
+      return {
+        kind: 'unavailable',
+        message: 'El buscador está algo saturado ahora mismo, intenta de nuevo en un momento.',
+      }
+    }
+    return { kind: 'generic', message: messageFromUnknown(err, 'No se pudo buscar. Intenta de nuevo.') }
   }
 
   // Búsqueda contra el backend, con debounce para no gastar cuota de la API en cada tecla
@@ -54,9 +73,7 @@ export function ClientView({ sessionName }: { sessionName?: string }) {
           setSearchError(null)
         })
         .catch((err) => {
-          if (err.name !== 'AbortError') {
-            setSearchError(messageFromUnknown(err, 'No se pudo buscar. Intenta de nuevo.'))
-          }
+          setSearchError(classifyError(err))
         })
         .finally(() => setSearching(false))
     }, 350)
@@ -115,6 +132,15 @@ export function ClientView({ sessionName }: { sessionName?: string }) {
             <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
           ) : null}
         </div>
+        {!searching && searchError ? (
+          <p
+            className={`mt-2 text-xs ${
+              searchError.kind === 'rate-limited' ? 'text-amber-500' : 'text-destructive'
+            }`}
+          >
+            {searchError.message}
+          </p>
+        ) : null}
       </header>
 
       <main className="flex-1 space-y-5 px-4 pb-32 pt-4">
