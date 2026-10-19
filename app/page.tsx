@@ -2,9 +2,27 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Music2, QrCode, Radio, Sparkles } from 'lucide-react'
+import { Music2, QrCode, Radio, Sparkles, Store, Users } from 'lucide-react'
 import { BrandLogo } from '@/components/collab/brand-logo'
-import { createSession } from '@/lib/api'
+import { createSession, type SessionType } from '@/lib/api'
+import { cn } from '@/lib/utils'
+
+const SESSION_TYPES: {
+  value: SessionType
+  label: string
+  description: string
+  icon: typeof Users
+  disabled?: boolean
+}[] = [
+  { value: 'meeting', label: 'Reunión', description: 'Para familia, amigos y fiestas.', icon: Users },
+  {
+    value: 'business',
+    label: 'Negocio',
+    description: 'Para restaurantes, bares y cafés.',
+    icon: Store,
+    disabled: true,
+  },
+]
 
 function suggestedSessionName(now = new Date()): string {
   const hh = String(now.getHours()).padStart(2, '0')
@@ -15,6 +33,7 @@ function suggestedSessionName(now = new Date()): string {
 export default function Page() {
   const router = useRouter()
   const [name, setName] = useState(() => suggestedSessionName())
+  const [type, setType] = useState<SessionType>('meeting')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -22,7 +41,7 @@ export default function Page() {
     setCreating(true)
     setError(null)
     try {
-      const s = await createSession(name.trim() || 'Sesión sin nombre')
+      const s = await createSession(name.trim() || 'Sesión sin nombre', type)
       router.push(`/panel/${s.id}?invite=1`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error creando la sesión')
@@ -71,6 +90,50 @@ export default function Page() {
                   onChange={(e) => setName(e.target.value)}
                   className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-0 transition focus:border-primary"
                 />
+                <div
+                  role="radiogroup"
+                  aria-label="Tipo de sesión"
+                  className="grid grid-cols-1 gap-2 pt-1 min-[420px]:grid-cols-2"
+                >
+                  {SESSION_TYPES.map((opt) => {
+                    const Icon = opt.icon
+                    const checked = type === opt.value
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={checked}
+                        aria-disabled={opt.disabled || undefined}
+                        tabIndex={opt.disabled ? -1 : checked ? 0 : -1}
+                        onClick={() => {
+                          if (!opt.disabled) setType(opt.value)
+                        }}
+                        onKeyDown={(e) => {
+                          if (opt.disabled && (e.key === ' ' || e.key === 'Enter')) e.preventDefault()
+                        }}
+                        className={cn(
+                          'flex items-start gap-3 rounded-xl border bg-card p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                          checked ? 'border-primary bg-primary/10' : 'border-border',
+                          opt.disabled ? 'cursor-not-allowed opacity-60' : !checked && 'hover:border-primary/50',
+                        )}
+                      >
+                        <Icon className={cn('mt-0.5 size-5 shrink-0', checked ? 'text-primary' : 'text-muted-foreground')} />
+                        <span className="min-w-0">
+                          <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-card-foreground">
+                            {opt.label}
+                            {opt.disabled ? (
+                              <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                Próximamente
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">{opt.description}</span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
                 <button
                   type="button"
                   onClick={handleCreate}
