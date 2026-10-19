@@ -241,7 +241,7 @@ export function ClientView({ sessionName }: { sessionName?: string }) {
             </p>
           ) : searchError ? (
             <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-center text-sm text-destructive">
-              {searchError}
+              {searchError.message}
             </p>
           ) : results.length === 0 && !searching ? (
             <p className="rounded-xl border border-border bg-card p-4 text-center text-sm text-muted-foreground">
