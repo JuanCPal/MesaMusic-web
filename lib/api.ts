@@ -29,6 +29,7 @@ export type BackendQueueItem = {
   song: BackendSong
   addedAt: string
   isBackup: boolean
+  requestedBy?: string
 }
 
 export type BackendQueueState = {
@@ -59,7 +60,7 @@ export function toQueueItem(item: BackendQueueItem, mineIds: Set<string>): Queue
   return {
     entryId: item.id,
     song: toSong(item.song),
-    requestedBy: 'Alguien',
+    requestedBy: item.requestedBy || 'Alguien',
     mine: mineIds.has(item.id),
   }
 }
@@ -115,11 +116,12 @@ export function getQrImageUrl(sessionId: string): string {
 export async function addSongToQueue(
   sessionId: string,
   videoId: string,
+  requestedBy: string,
 ): Promise<BackendQueueItem> {
   const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/queue`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ videoId }),
+    body: JSON.stringify({ videoId, requestedBy }),
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
