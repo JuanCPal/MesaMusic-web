@@ -35,7 +35,8 @@ Abre `http://localhost:3000`. La app ya no es una sola pantalla con switcher:
 cada rol tiene su propia ruta, para que recargar la página no pierda el
 estado de la sesión.
 
-* **`/`** — pantalla de inicio: crear una sesión nueva (nombre opcional). Al
+* **`/`** — pantalla de inicio: crear una sesión nueva (nombre opcional) y elegir el tipo de sesión
+(Reunión activa; Negocio aparece como «Próximamente»). Al
 crear, redirige automáticamente a `/panel/{sessionId}`.
 * **`/panel/[sessionId]`** — vista del host: reproduce con el IFrame Player
 real de YouTube, muestra la cola en vivo, permite **eliminar** y **saltar**
