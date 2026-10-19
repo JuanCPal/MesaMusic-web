@@ -13,7 +13,10 @@ import {
 } from 'lucide-react'
 import { formatDuration, formatWait, type Song } from '@/lib/music'
 import { ApiError, searchSongs } from '@/lib/api'
+import { loadParticipantName, saveParticipantName } from '@/lib/participant'
+import { Avatar } from './avatar'
 import { BrandLogo } from './brand-logo'
+import { NameModal } from './name-modal'
 import { useMusic } from './music-provider'
 import { ProgressBar } from './progress-bar'
 
@@ -29,7 +32,14 @@ export function ClientView({ sessionName }: { sessionName?: string }) {
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<SearchErrorState>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [participantName, setParticipantName] = useState<string | null>(null)
+  // Modal abierto; pendingSong es la canción tocada antes de tener nombre.
+  const [nameModalOpen, setNameModalOpen] = useState(false)
+  const [pendingSong, setPendingSong] = useState<Song | null>(null)
 
+  useEffect(() => {
+    setParticipantName(loadParticipantName())
+  }, [])
   const abortRef = useRef<AbortController | null>(null)
 
   function messageFromUnknown(err: unknown, fallback: string): string {
@@ -81,15 +91,37 @@ export function ClientView({ sessionName }: { sessionName?: string }) {
     return () => clearTimeout(timeout)
   }, [query])
 
-  async function handleAdd(song: Song) {
+  async function addWithName(song: Song, name: string) {
     try {
-      await addSong(song)
+      await addSong(song, name)
       setToast(song.title)
       window.setTimeout(() => setToast(null), 2200)
     } catch (err) {
       setToast(messageFromUnknown(err, 'No se pudo agregar, intenta de nuevo'))
       window.setTimeout(() => setToast(null), 2200)
     }
+  }
+
+  function handleAdd(song: Song) {
+    if (!participantName) {
+      setPendingSong(song)
+      setNameModalOpen(true)
+      return
+    }
+    void addWithName(song, participantName)
+  }
+
+  function closeNameModal() {
+    setNameModalOpen(false)
+    setPendingSong(null)
+  }
+
+  function handleNameConfirm(name: string) {
+    saveParticipantName(name)
+    setParticipantName(name)
+    const song = pendingSong
+    closeNameModal()
+    if (song) void addWithName(song, name)
   }
 
   return (
@@ -113,6 +145,17 @@ export function ClientView({ sessionName }: { sessionName?: string }) {
               />
               {connected ? 'Conectado' : 'Conectando…'}
               {sessionName ? <span className="truncate">· {sessionName}</span> : null}
+              {participantName ? (
+                <button
+                  type="button"
+                  onClick={() => setNameModalOpen(true)}
+                  aria-label={`Cambiar nombre, actual: ${participantName}`}
+                  className="ml-1 inline-flex max-w-32 items-center gap-1 rounded-full border border-border bg-muted px-1.5 py-0.5 text-[11px] text-foreground transition-colors hover:bg-secondary"
+                >
+                  <Avatar name={participantName} size={14} />
+                  <span className="truncate">{participantName}</span>
+                </button>
+              ) : null}
             </p>
           </div>
         </div>
@@ -166,6 +209,11 @@ export function ClientView({ sessionName }: { sessionName?: string }) {
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
                   {nowPlaying.song.channel}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  pedida por{' '}
+                  <Avatar name={nowPlaying.requestedBy} size={14} className="mx-0.5" />{' '}
+                  {nowPlaying.requestedBy}
                 </p>
                 <ProgressBar
                   className="mt-2"
@@ -297,6 +345,15 @@ export function ClientView({ sessionName }: { sessionName?: string }) {
           </div>
         ) : null}
       </div>
+
+      {nameModalOpen ? (
+        <NameModal
+          initialName={participantName ?? ''}
+          confirmLabel={pendingSong ? 'Agregar canción' : 'Guardar'}
+          onConfirm={handleNameConfirm}
+          onCancel={closeNameModal}
+        />
+      ) : null}
     </div>
   )
 }
