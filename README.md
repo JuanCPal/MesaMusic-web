@@ -45,7 +45,8 @@ pedir el estado de la sesión al backend usando el `sessionId` de la URL, en
 vez de reiniciar a la pantalla de creación.
 * **`/join/[sessionId]`** — la que abre alguien al escanear el QR: busca
 canciones (contra la YouTube Data API a través de tu backend) y las agrega
-a la cola.
+a la cola. La primera vez que agrega una canción pide un nombre, que se
+guarda en el navegador y se muestra con un avatar junto a sus canciones.
 
 ## Cómo quedó conectado
 
