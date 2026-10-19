@@ -42,11 +42,14 @@ crear, redirige automáticamente a `/panel/{sessionId}`.
 real de YouTube, muestra la cola en vivo, permite **eliminar** y **saltar**
 canciones, y abre el modal de QR/link para invitar. Al recargar, vuelve a
 pedir el estado de la sesión al backend usando el `sessionId` de la URL, en
-vez de reiniciar a la pantalla de creación.
+vez de reiniciar a la pantalla de creación. Tiene botón «Inicio» para volver
+a la home, con confirmación porque la música y la cola se detienen.
 * **`/join/[sessionId]`** — la que abre alguien al escanear el QR: busca
 canciones (contra la YouTube Data API a través de tu backend) y las agrega
 a la cola. La primera vez que agrega una canción pide un nombre, que se
 guarda en el navegador y se muestra con un avatar junto a sus canciones.
+Tiene botón «Inicio» para volver a la home, con confirmación; el nombre y
+sus canciones guardadas se conservan.
 
 ## Cómo quedó conectado
 

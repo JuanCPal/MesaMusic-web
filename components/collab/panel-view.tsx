@@ -1,8 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
+  ArrowLeft,
+  Check,
   ChevronLeft,
+  Copy,
   ChevronRight,
   ImportIcon,
   ListMusic,
@@ -18,6 +22,7 @@ import {
 import { formatDuration } from '@/lib/music'
 import { BrandLogo } from './brand-logo'
 import { Avatar } from './avatar'
+import { ConfirmDialog } from './confirm-dialog'
 import { useMusic } from './music-provider'
 import { ProgressBar } from './progress-bar'
 import { HiMiniPlay, HiMiniPause, HiPlay, HiPause } from 'react-icons/hi2'
@@ -57,6 +62,9 @@ function loadYouTubeScript(): Promise<void> {
 }
 
 export function PanelView({ sessionName, onInviteClick }: PanelViewProps) {
+  const router = useRouter()
+  const [leaveOpen, setLeaveOpen] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const { nowPlaying, queue, connected, reportEnded, skipCurrent, removeItem } = useMusic()
 
   const playerRef = useRef<any>(null)
@@ -235,12 +243,36 @@ export function PanelView({ sessionName, onInviteClick }: PanelViewProps) {
     }
   }, [removeItem])
 
+  const closeLeave = useCallback(() => {
+    setLeaveOpen(false)
+    setLinkCopied(false)
+  }, [])
+
+  const copyPanelLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}`)
+      setLinkCopied(true)
+      window.setTimeout(() => setLinkCopied(false), 1500)
+    } catch {
+      setLinkCopied(false)
+    }
+  }, [])
+
   return (
     <div className="flex h-dvh w-full flex-col overflow-hidden bg-background lg:flex-row">
       {/* Zona principal: reproductor */}
       <section className="flex min-h-0 flex-1 flex-col px-4 py-2 lg:px-8 lg:py-6">
         <header className="mb-4 flex shrink-0 items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setLeaveOpen(true)}
+              aria-label="Inicio"
+              className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:px-3"
+            >
+              <ArrowLeft className="size-4" />
+              <span className="hidden sm:inline">Inicio</span>
+            </button>
             <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary-foreground">
               <BrandLogo className="size-11" />
             </span>
@@ -453,6 +485,27 @@ export function PanelView({ sessionName, onInviteClick }: PanelViewProps) {
           </div>
         </div>
       </div>
+
+      {leaveOpen ? (
+        <ConfirmDialog
+          title="¿Salir del panel?"
+          description="La sesión sigue activa y las personas pueden seguir agregando canciones, pero la música se detiene y la cola no avanza hasta que vuelvas a abrir este panel. Para volver, usa el botón Atrás del navegador o abre el link del panel."
+          confirmLabel="Salir"
+          cancelLabel="Quedarme"
+          onConfirm={() => router.push('/')}
+          onCancel={closeLeave}
+          secondaryAction={
+            <button
+              type="button"
+              onClick={copyPanelLink}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+            >
+              {linkCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
+              {linkCopied ? 'Copiado' : 'Copiar link del panel'}
+            </button>
+          }
+        />
+      ) : null}
     </div>
   )
 }
