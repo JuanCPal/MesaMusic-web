@@ -14,9 +14,12 @@ type BackendSong = {
   durationSeconds: number
 }
 
+export type SessionType = 'meeting' | 'business'
+
 export type Session = {
   id: string
   name: string
+  type: SessionType
   status: 'active' | 'ended'
   joinUrl: string
 }
@@ -86,11 +89,11 @@ export async function searchSongs(query: string, signal?: AbortSignal): Promise<
   return data.results.map(toSong)
 }
 
-export async function createSession(name: string): Promise<Session> {
+export async function createSession(name: string, type: SessionType): Promise<Session> {
   const res = await fetch(`${API_BASE_URL}/api/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, type }),
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
