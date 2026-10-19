@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import {
+  ArrowLeft,
   Check,
   Clock3,
   ListMusic,
@@ -16,6 +18,7 @@ import { ApiError, searchSongs } from '@/lib/api'
 import { loadParticipantName, saveParticipantName } from '@/lib/participant'
 import { Avatar } from './avatar'
 import { BrandLogo } from './brand-logo'
+import { ConfirmDialog } from './confirm-dialog'
 import { NameModal } from './name-modal'
 import { useMusic } from './music-provider'
 import { ProgressBar } from './progress-bar'
@@ -35,6 +38,8 @@ export function ClientView({ sessionName }: { sessionName?: string }) {
   const [participantName, setParticipantName] = useState<string | null>(null)
   // Modal abierto; pendingSong es la canción tocada antes de tener nombre.
   const [nameModalOpen, setNameModalOpen] = useState(false)
+  const [leaveOpen, setLeaveOpen] = useState(false)
+  const router = useRouter()
   const [pendingSong, setPendingSong] = useState<Song | null>(null)
 
   useEffect(() => {
@@ -129,17 +134,26 @@ export function ClientView({ sessionName }: { sessionName?: string }) {
       {/* Encabezado + búsqueda */}
       <header className="sticky top-0 z-20 border-b border-border bg-background/85 px-4 pb-3 pt-4 backdrop-blur-md">
         <div className="mb-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setLeaveOpen(true)}
+            aria-label="Inicio"
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-border bg-card px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:px-3"
+          >
+            <ArrowLeft className="size-4" />
+            <span className="hidden sm:inline">Inicio</span>
+          </button>
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary-foreground">
             <BrandLogo className="size-8" />
           </span>
-          <div className="leading-tight">
+          <div className="min-w-0 leading-tight">
             <div className='flex gap-1'>
               <p className="text-sm font-semibold text-chart-5">mesamusic<span className='text-chart-3'>.co </span></p>
               <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-chart-5/80">
                  BETA
               </div>
             </div>
-            <p className="flex items-center gap-1 text-xs text-muted-foreground">
+            <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
               <span
                 className={`size-1.5 rounded-full ${connected ? 'bg-primary' : 'bg-muted-foreground/50'}`}
               />
@@ -352,6 +366,17 @@ export function ClientView({ sessionName }: { sessionName?: string }) {
           confirmLabel={pendingSong ? 'Agregar canción' : 'Guardar'}
           onConfirm={handleNameConfirm}
           onCancel={closeNameModal}
+        />
+      ) : null}
+
+      {leaveOpen ? (
+        <ConfirmDialog
+          title="¿Salir de la sesión?"
+          description="Las canciones que pediste se quedan en la cola. Para volver, abre de nuevo el link o escanea el QR de la sesión."
+          confirmLabel="Salir"
+          cancelLabel="Quedarme"
+          onConfirm={() => router.push('/')}
+          onCancel={() => setLeaveOpen(false)}
         />
       ) : null}
     </div>
