@@ -45,7 +45,7 @@ type MusicContextValue = {
   queue: QueueItem[]
   /** true si el WebSocket está conectado */
   connected: boolean
-  addSong: (song: Song) => Promise<void>
+  addSong: (song: Song, requestedBy: string) => Promise<void>
   skipCurrent: () => Promise<void>
   removeItem: (entryId: string) => Promise<void>
   /** avisa al backend que la canción actual terminó / debe saltarse */
@@ -171,7 +171,7 @@ export function MusicProvider({
     if (!rawState.nowPlaying) return null
     return {
       song: toSong(rawState.nowPlaying.song),
-      requestedBy: 'la casa',
+      requestedBy: rawState.nowPlaying.requestedBy || 'Alguien',
       isBackup: rawState.nowPlaying.isBackup,
     }
   }, [rawState.nowPlaying])
@@ -196,8 +196,8 @@ export function MusicProvider({
     return result
   }, [rawState.queue, rawState.estimatedWaitSecs])
 
-  const addSong = useCallback(async (song: Song) => {
-    const created = await addSongToQueue(sessionId, song.id)
+  const addSong = useCallback(async (song: Song, requestedBy: string) => {
+    const created = await addSongToQueue(sessionId, song.id, requestedBy)
     mineIdsRef.current.add(created.id)
     saveMineIds(mineIdsRef.current)
     // No hace falta actualizar rawState manualmente: el backend hace

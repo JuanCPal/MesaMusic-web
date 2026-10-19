@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { formatDuration } from '@/lib/music'
 import { BrandLogo } from './brand-logo'
+import { Avatar } from './avatar'
 import { useMusic } from './music-provider'
 import { ProgressBar } from './progress-bar'
 import { HiMiniPlay, HiMiniPause, HiPlay, HiPause } from 'react-icons/hi2'
@@ -357,7 +358,9 @@ export function PanelView({ sessionName, onInviteClick }: PanelViewProps) {
                       {item.song.title}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {item.song.channel} · pedida por {item.requestedBy}
+                      {item.song.channel} · pedida por{' '}
+                      <Avatar name={item.requestedBy} size={14} className="mx-0.5" />{' '}
+                      {item.requestedBy}
                     </p>
                   </div>
                   <span className="flex-none font-mono text-xs text-muted-foreground">
@@ -396,9 +399,15 @@ export function PanelView({ sessionName, onInviteClick }: PanelViewProps) {
                 {nowPlaying?.song.title ?? 'Esperando reproducción'}
               </p>
               <p className="truncate text-xs text-muted-foreground">
-                {nowPlaying
-                  ? `${nowPlaying.song.channel} · pedida por ${nowPlaying.requestedBy}`
-                  : 'La cola está vacía por ahora'}
+                {nowPlaying ? (
+                  <>
+                    {nowPlaying.song.channel} · pedida por{' '}
+                    <Avatar name={nowPlaying.requestedBy} size={14} className="mx-0.5" />{' '}
+                    {nowPlaying.requestedBy}
+                  </>
+                ) : (
+                  'La cola está vacía por ahora'
+                )}
               </p>
             </div>
 
